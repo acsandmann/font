@@ -7,15 +7,11 @@ edition = "2021"
 crate-type = ['cdylib']
 
 [dependencies]
-fontdue = '0.8.0'
-image = { version = '0.23.14', default_features = false }
-nanoserde = '0.1.29'
+fontdue = { version = '0.8.0', default-features = false }
+nanoserde = { version = '0.1.29' }
 minivec = "0.4.0"
-
-[dependencies.smallbox]
-version = "0.8"
-features = ["coerce"]
-default-features = false
+smallbox = { version = '0.8', features = ['coerce'], default_features = false }
+image = { version = '0.23.14', default_features = false }
 
 [profile.release]
 lto = 'fat'
