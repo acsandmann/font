@@ -55,9 +55,9 @@ test('layout#rasterize', () => {
     const r = l.rasterize(255, 255, 255);
     
     assert.instance(r.buffer, Uint8Array);
-    assert.equal(r.buffer.length, 2184);
+    assert.equal(r.buffer.length, 2496);
     assert.equal(r.width, 39);
-    assert.equal(r.height, 14);
+    assert.equal(r.height, 16);
 });
 
 

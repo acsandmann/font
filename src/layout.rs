@@ -1,35 +1,19 @@
 #![allow(non_camel_case_types)]
-use alloc::vec::Vec;
 use core::borrow::BorrowMut;
 
 use fontdue::layout::{CoordinateSystem, HorizontalAlign, Layout, LayoutSettings, TextStyle, VerticalAlign, WrapStyle};
-use image::{imageops::overlay_bounds, GenericImage, GenericImageView, GrayImage, ImageBuffer, Pixel, Rgba, RgbaImage};
 use nanoserde::DeJson;
 use smallbox::SmallBox as Box;
 
-use crate::{color::Color, structs::*};
+use crate::{color::Color, framebuffer::framebuffer as fb, structs::*};
 #[allow(non_upper_case_globals)]
-const empty: Rgba<u8> = Rgba([0, 0, 0, 0]);
-
-#[inline]
-unsafe fn overlay<I, J>(bottom: &mut I, top: &J, x: u32, y: u32)
-where
-  I: GenericImage,
-  J: GenericImageView<Pixel = I::Pixel>, {
-  let c = overlay_bounds(bottom.dimensions(), top.dimensions(), x, y); // (range_width, range_height)
-  (0..c.1).for_each(|top_y| {
-    (0..c.0).for_each(|top_x| {
-      let x = top_x + x;
-      let y = top_y + y;
-      let mut bottom_pixel = bottom.unsafe_get_pixel(x, y);
-      bottom_pixel.blend(&top.unsafe_get_pixel(top_x, top_y));
-      bottom.unsafe_put_pixel(x, y, bottom_pixel);
-    });
-  });
-}
+const EMPTY: [u8; 4] = [0, 0, 0, 0];
 
 #[no_mangle]
 unsafe extern "C" fn layout_new() -> layout { crate::ffi::ptr::pack(Box::new(l_box::new(Layout::new(CoordinateSystem::PositiveYDown)))) }
+
+#[no_mangle]
+unsafe extern "C" fn layout_free(l: layout) { let _ = alloc::boxed::Box::from_raw(l.into()); }
 
 #[no_mangle]
 unsafe extern "C" fn layout_clear(l: layout) { (*l).clear(); }
@@ -90,36 +74,74 @@ unsafe extern "C" fn layout_append(l: layout, fptr: font, ptr: crate::ffi::mem::
 
 #[no_mangle]
 unsafe extern "C" fn layout_rasterize(l: layout<u32>, r: u8, g: u8, b: u8, a: u8) -> rd_ptr {
-  // let height = (*l).layout.height() as u32;
-  let fonts = &(*l).fonts;
-  let glyphs = &(*l).layout.glyphs();
-  let mm1 = glyphs.iter().map(|x| x.width as u32).collect::<Vec<u32>>();
-  let mm2 = glyphs.iter().map(|x| x.x as u32).collect::<Vec<u32>>();
-  let mm3 = glyphs.iter().map(|x| x.height as u32).collect::<Vec<u32>>();
-  let mm4 = glyphs.iter().map(|x| x.y as u32).collect::<Vec<u32>>();
-  let width = mm1.iter().max().unwrap_unchecked() + mm2.iter().max().unwrap_unchecked();
-  let height = mm3.iter().max().unwrap_unchecked() + mm4.iter().max().unwrap_unchecked();
-  // let height = (l_g.height + l_g.y as usize) as u32;
-  let mut opacity = GrayImage::new(width, height);
-  glyphs.iter().for_each(|&glyph| {
-    let (metrics, bitmap) = fonts.get_unchecked(glyph.font_index).rasterize_config(glyph.key);
-    let bitmap = ImageBuffer::from_vec(metrics.width as u32, metrics.height as u32, bitmap).unwrap_unchecked();
-    overlay(&mut opacity, &bitmap, glyph.x as u32, glyph.y as u32)
-  });
-  // Rgb::from([r, g, b]).to_rgba();
-  let mut cell = RgbaImage::from_pixel(width, height, empty);
-  cell.pixels_mut().zip(opacity.pixels().map(|&pixel| pixel.0[0])).for_each(|(pixel, opacity)| {
-    if opacity != 0 {
-      let s = &mut pixel.channels_mut()[..];
-      core::ptr::copy((&[r, g, b, opacity & a]).as_ptr(), s.as_mut_ptr(), s.len());
-    }
-  });
+    let fonts = &(*l).fonts;
+    let glyphs = &(*l).layout.glyphs();
 
-  crate::ffi::ptr::pack(raster_data {
-    buffer: cell.into_raw(),
-    width,
-    height,
-  })
+    let mut max_width = 0;
+    let mut max_x = 0;
+    let mut max_height = 0;
+    let mut max_y = 0;
+    let mut max_scale = glyphs[0].key.px;
+
+    for glyph in glyphs.iter() {
+        let width = glyph.width as usize;
+        let x = glyph.x as usize;
+        let height = glyph.height as usize;
+        let y = glyph.y as usize;
+        let scale = glyph.key.px;
+
+        if width > max_width {
+            max_width = width;
+        }
+        if x > max_x {
+            max_x = x;
+        }
+        if height > max_height {
+            max_height = height;
+        }
+        if y > max_y {
+            max_y = y;
+        }
+        if scale > max_scale {
+            max_scale = scale;
+        }
+    }
+
+    let width = max_width + max_x;
+    let height = max_height + max_y;
+    let scale = max_scale;
+    let bottom_padding = (scale * 0.2) as usize;
+    let padded_height = height + bottom_padding;
+    let mut framebuffer = fb::new(width, padded_height);
+
+    glyphs.iter().for_each(|&glyph| {
+        let (metrics, bitmap) = fonts.get_unchecked(glyph.font_index).rasterize_config(glyph.key);
+
+        for y in 0..metrics.height as usize {
+            for x in 0..metrics.width as usize {
+                let bitmap_index = y * metrics.width as usize + x;
+                let alpha = *bitmap.get_unchecked(bitmap_index);
+
+                let framebuffer_x = glyph.x as usize + x;
+                let framebuffer_y = glyph.y as usize + y;
+                if framebuffer_x < width && framebuffer_y < padded_height - bottom_padding {
+                    let framebuffer_index = (framebuffer_y * width + framebuffer_x) * 4;
+                    let pixel = core::slice::from_raw_parts_mut(framebuffer.as_mut_ptr::<u8>().add(framebuffer_index), 4);
+                    pixel[0] = (r as u16 * alpha as u16 / 255) as u8;
+                    pixel[1] = (g as u16 * alpha as u16 / 255) as u8;
+                    pixel[2] = (b as u16 * alpha as u16 / 255) as u8;
+                    pixel[3] = (a as u16 * alpha as u16 / 255) as u8;
+                }
+            }
+        }
+    });
+
+    let (w, h) = (framebuffer.width, framebuffer.height);
+    crate::ffi::ptr::pack(raster_data {
+        buffer: framebuffer.into_vec(),
+        width: w as u32,
+        height: h as u32,
+    })
 }
 
 #[no_mangle]
