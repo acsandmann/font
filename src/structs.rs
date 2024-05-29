@@ -101,7 +101,7 @@ impl l_box {
   pub fn new(f: Layout) -> l_box {
     l_box {
       layout: f,
-      fonts: MiniVec::new(), // MiniVec::with_capacity(1),
+      fonts: MiniVec::new(),
     }
   }
 
