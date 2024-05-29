@@ -5,11 +5,7 @@ use fontdue::layout::{CoordinateSystem, HorizontalAlign, Layout, LayoutSettings,
 use nanoserde::DeJson;
 use smallbox::SmallBox as Box;
 
-use crate::{
-  color::rgba,
-  framebuffer::framebuffer as fb,
-  structs::*,
-};
+use crate::{color::rgba, framebuffer::framebuffer as fb, structs::*};
 
 #[no_mangle]
 unsafe extern "C" fn layout_new() -> layout { crate::ffi::ptr::pack(Box::new(l_box::new(Layout::new(CoordinateSystem::PositiveYDown)))) }
@@ -21,12 +17,7 @@ unsafe extern "C" fn layout_free(l: layout) { let _ = alloc::boxed::Box::from_ra
 unsafe extern "C" fn layout_clear(l: layout) { (*l).clear(); }
 
 #[no_mangle]
-unsafe extern "C" fn layout_lines(l: layout) -> usize {
-  match (*l).layout.lines() {
-    None => 0,
-    Some(lp) => lp.len(),
-  }
-}
+unsafe extern "C" fn layout_lines(l: layout) -> usize { (*l).layout.lines().map_or(0, |lp| lp.len()) }
 
 #[no_mangle]
 unsafe extern "C" fn layout_reset(l: layout, ptr: crate::ffi::mem::buf, size: usize) {
@@ -70,7 +61,7 @@ unsafe extern "C" fn layout_reset(l: layout, ptr: crate::ffi::mem::buf, size: us
 unsafe extern "C" fn layout_append(l: layout, fptr: font, ptr: crate::ffi::mem::buf, size: usize, scale: f32, has_color: bool, r: u8, g: u8, b: u8, a: u8) {
   let l: layout<u32> = core::mem::transmute(l);
   let len = (*l).add_font((&(*fptr)).clone());
-  let c = if has_color { rgba {r, g, b, a }.into() } else { 0 };
+  let c = if has_color { rgba { r, g, b, a }.into() } else { 0 };
   (*l).layout.append(&(*l).fonts, &(TextStyle::with_user_data(crate::ffi::io::str(ptr, size), scale, len, c)));
 }
 

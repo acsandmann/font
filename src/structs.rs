@@ -6,14 +6,14 @@ use minivec::MiniVec;
 use nanoserde::{DeJson, SerJson};
 use smallbox::{space::S1, SmallBox as Box};
 
-#[derive(SerJson, DeJson)]
+#[derive(SerJson)]
 pub struct outline_bounds {
   xmin: f32,
   ymin: f32,
   width: f32,
   height: f32,
 }
-#[derive(SerJson, DeJson)]
+#[derive(SerJson)]
 pub struct metrics {
   xmin: i32,
   ymin: i32,
@@ -43,27 +43,27 @@ impl From<fontdue::Metrics> for metrics {
   }
 }
 
-#[derive(SerJson, DeJson)]
+#[derive(DeJson)]
 pub enum horizontal_align {
   left,
   center,
   right,
 }
 
-#[derive(SerJson, DeJson)]
+#[derive(DeJson)]
 pub enum vertical_align {
   top,
   middle,
   bottom,
 }
 
-#[derive(SerJson, DeJson)]
+#[derive(DeJson)]
 pub enum wrap_style {
   word,
   letter,
 }
 
-#[derive(SerJson, DeJson)]
+#[derive(DeJson)]
 pub struct layout_settings {
   // pub x: f32,
   // pub y: f32,
@@ -98,12 +98,7 @@ pub struct l_box<U: Copy + Clone = ()> {
 }
 
 impl l_box {
-  pub fn new(f: Layout) -> l_box {
-    l_box {
-      layout: f,
-      fonts: MiniVec::new(),
-    }
-  }
+  pub fn new(f: Layout) -> l_box { l_box { layout: f, fonts: MiniVec::new() } }
 
   pub fn clear(&mut self) {
     self.layout.clear();
