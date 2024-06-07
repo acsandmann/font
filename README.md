@@ -1,6 +1,6 @@
-# Font Rendering Library
+# @asandmann/font
 
-This library provides tools for handling font rendering, layout creation, and text rasterization in bitmap format.
+This wasm wrapping of [fontdue](https://github.com/mooman219/fontdue) provides tools for handling font rendering, layout creation, and text rasterization in bitmap format. 
 
 ## Installation
 
