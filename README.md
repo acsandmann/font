@@ -8,6 +8,48 @@ This wasm wrapping of [fontdue](https://github.com/mooman219/fontdue) provides t
 npm install @asandmann/font
 ```
 
+## Example
+
+```typescript
+import { Font, Layout } from '@asandmann/font';
+
+// Create a font instance
+const fontBuffer = new Uint8Array(); // Load your font buffer
+const font = new Font(1.0, fontBuffer);
+
+// Check if the font has a glyph for 'A'
+if (font.has('A')) {
+    // Get metrics for 'A'
+    const metrics = font.metrics('A');
+
+    // Rasterize 'A'
+    const rasterizedChar = font.rasterize('A');
+}
+
+// Create a layout instance
+const layout = new Layout();
+
+// Set layout options
+layout.reset({
+    max_width: 500,
+    wrap_style: 'word',
+    vertical_align: 'middle',
+    horizontal_align: 'center'
+});
+
+// Append text to the layout
+layout.append(font, 'Hello, World!', { scale: 1, r: 255, g: 255, b: 255 });
+
+// Render the layout
+const rasterizedLayout = layout.rasterize(0, 0, 0);
+
+// Clean up
+font.free();
+layout.clear();
+```
+
+This example demonstrates how to create a font instance, check for glyph availability, get character metrics, rasterize a character, create a layout, set layout options, append text, and render the layout to a bitmap.
+
 ## Usage
 
 ### Font Class
@@ -60,45 +102,3 @@ Creates a new layout instance.
 
 - **rasterize(r: number, g: number, b: number): layout_rasterized**  
   Renders the layout to a bitmap.
-
-## Example
-
-```typescript
-import { Font, Layout } from '@asandmann/font';
-
-// Create a font instance
-const fontBuffer = new Uint8Array(); // Load your font buffer
-const font = new Font(1.0, fontBuffer);
-
-// Check if the font has a glyph for 'A'
-if (font.has('A')) {
-    // Get metrics for 'A'
-    const metrics = font.metrics('A');
-
-    // Rasterize 'A'
-    const rasterizedChar = font.rasterize('A');
-}
-
-// Create a layout instance
-const layout = new Layout();
-
-// Set layout options
-layout.reset({
-    max_width: 500,
-    wrap_style: 'word',
-    vertical_align: 'middle',
-    horizontal_align: 'center'
-});
-
-// Append text to the layout
-layout.append(font, 'Hello, World!', { scale: 1, r: 255, g: 255, b: 255 });
-
-// Render the layout
-const rasterizedLayout = layout.rasterize(0, 0, 0);
-
-// Clean up
-font.free();
-layout.clear();
-```
-
-This example demonstrates how to create a font instance, check for glyph availability, get character metrics, rasterize a character, create a layout, set layout options, append text, and render the layout to a bitmap.
